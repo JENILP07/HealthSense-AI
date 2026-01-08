@@ -5,17 +5,29 @@ import joblib
 import pandas as pd
 import numpy as np
 import os
+import logging
+
+# Configure Logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
 # CORS Configuration
-# Allow all origins for troubleshooting
-origins = ["*"]
+# Production Best Practice: Only allow your specific frontend domain
+# Default to "*" for development convenience
+frontend_url = os.getenv("FRONTEND_URL", "*")
+origins = [frontend_url] if frontend_url != "*" else ["*"]
+
+logger.info(f"CORS Origins configured: {origins}")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -35,9 +47,9 @@ try:
     model = joblib.load(MODEL_PATH)
     scaler = joblib.load(SCALER_PATH)
     threshold_val = joblib.load(THRESHOLD_PATH)
-    print("✅ Models loaded successfully")
+    logger.info("✅ Models loaded successfully")
 except Exception as e:
-    print(f"❌ Error loading models: {e}")
+    logger.error(f"❌ Error loading models: {e}")
     model = None
     scaler = None
     threshold_val = 0.5
@@ -63,6 +75,7 @@ def read_root():
 @app.post("/predict")
 def predict_heart_risk(data: PatientData):
     if not model or not scaler:
+        logger.critical("Prediction attempted with models not loaded")
         raise HTTPException(status_code=500, detail="Models not loaded")
 
     try:
@@ -119,6 +132,8 @@ def predict_heart_risk(data: PatientData):
         proba = model.predict_proba(df)[0, 1]
         prediction = 1 if proba >= threshold_val else 0
         
+        logger.info(f"Prediction made: Risk={prediction}, Probability={proba:.4f}")
+        
         return {
             "prediction": int(prediction),
             "probability": float(round(proba, 4)),
@@ -126,8 +141,12 @@ def predict_heart_risk(data: PatientData):
         }
 
     except Exception as e:
+        logger.error(f"Prediction Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Use PORT env var for deployment (e.g. Heroku, Render)
+    port = int(os.getenv("PORT", 8000))
+    logger.info(f"Starting server on port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)

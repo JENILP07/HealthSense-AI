@@ -1,12 +1,12 @@
 import type { HealthData } from "@/components/HealthInputForm";
 
-interface FeatureData {
+export interface FeatureData {
   name: string;
   value: number;
   impact: "positive" | "negative";
 }
 
-interface PredictionResult {
+export interface PredictionResult {
   riskScore: number;
   features: FeatureData[];
   recommendations: string[];

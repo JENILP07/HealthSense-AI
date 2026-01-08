@@ -2,21 +2,9 @@ import { useState } from "react";
 import Header from "@/components/Header";
 import HealthInputForm, { HealthData } from "@/components/HealthInputForm";
 import PredictionResults from "@/components/PredictionResults";
+import { analyzeCVDRisk, PredictionResult } from "@/lib/mockPrediction";
 import { getHeartPrediction, PatientData } from "@/services/api";
 import { Brain, Shield, Zap, Database, Heart, Activity } from "lucide-react";
-
-interface FeatureData {
-  name: string;
-  value: number;
-  impact: "positive" | "negative";
-}
-
-interface PredictionResult {
-  riskScore: number;
-  features: FeatureData[];
-  recommendations: string[];
-  modelUsed: string;
-}
 
 const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -25,7 +13,10 @@ const Index = () => {
   const handleSubmit = async (data: HealthData) => {
     setIsLoading(true);
     try {
-      // Map Form Data to API Payload
+      // 1. Get Explanations (Hybrid Approach: Use local logic for features)
+      const mockResult = await analyzeCVDRisk(data);
+
+      // 2. Prepare Payload for Real Backend
       const payload: PatientData = {
         age: data.age,
         gender: data.gender,
@@ -40,31 +31,24 @@ const Index = () => {
         active: data.active ? 1 : 0,
       };
 
+      // 3. Call Real Backend for the Score
+      // Note: You must have the backend running on port 8000
       const apiResponse = await getHeartPrediction(payload);
 
-      // Transform API Response to UI Result
-      const riskScore = Math.round(apiResponse.probability * 100);
+      // 4. Merge Results: Real Score + Explained Features
+      setResult({
+        ...mockResult,
+        riskScore: Math.round(apiResponse.probability * 100),
+        modelUsed: "Gradient Boosting (Real Backend)",
+      });
 
-      const predictionResult: PredictionResult = {
-        riskScore: riskScore,
-        modelUsed: "Gradient Boosting Classifier",
-        features: [
-          // Dummy features for UI compatibility since backend doesn't return SHAP yet
-          { name: "Age", value: data.age, impact: data.age > 60 ? "negative" : "positive" },
-          { name: "Systolic BP", value: data.systolicBP, impact: data.systolicBP > 130 ? "negative" : "positive" },
-          { name: "BMI", value: Math.round(data.weight / ((data.height / 100) ** 2)), impact: "negative" }
-        ],
-        recommendations: [
-          "Maintain a healthy diet low in saturated fats.",
-          "Engage in at least 150 minutes of moderate activity per week.",
-          "Regularly monitor your blood pressure."
-        ]
-      };
-
-      setResult(predictionResult);
     } catch (error) {
       console.error("Prediction failed:", error);
-      alert("Failed to get prediction from server. Ensure backend is running.");
+      alert("Failed to connect to Backend (http://localhost:8000). Using local estimate instead.");
+
+      // Fallback to purely local if backend fails
+      const fallbackResult = await analyzeCVDRisk(data);
+      setResult(fallbackResult);
     } finally {
       setIsLoading(false);
     }
