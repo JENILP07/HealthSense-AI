@@ -38,17 +38,13 @@ const Header = () => {
             </Button>
             <Button variant="ghost" size="icon" asChild>
               <a 
-                href="https://github.com" 
+                href="https://github.com/JENILP07/HealthSense-AI" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 aria-label="View on GitHub"
               >
                 <Github className="w-4 h-4" />
               </a>
-            </Button>
-            <Button variant="outline" size="sm" className="hidden sm:flex gap-2">
-              <ExternalLink className="w-4 h-4" />
-              API Docs
             </Button>
           </div>
         </div>
